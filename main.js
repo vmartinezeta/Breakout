@@ -1,5 +1,6 @@
 // Autor: midudev
 // Refactorizado por Víctor Martínez
+import { Aplicador } from "./classes/Aplicador.js"
 import PhysicsBody from "./classes/PhysicsBody.js"
 import { Potenciador } from "./classes/Potenciador.js"
 import { $, crearBoton, crearTitulo } from "./functions/components.js"
@@ -52,9 +53,10 @@ const ballCollision = new PhysicsBody(state.x, state.y, state.ballRadius, state.
 const paddleCollision = new PhysicsBody(state.paddleX, state.paddleY, 50, 10)
 
 
-const brickRowCount = 6;
-const brickColumnCount = 13;
+const brickRowCount = 6
+const brickColumnCount = 13
 let bricks = []
+
 
 const brick = {
   width: 32,
@@ -64,38 +66,62 @@ const brick = {
   offsetLeft: 52
 }
 
-const EstadoPotenciador = {
+const ClasePotenciador = {
   BLOQUE: "BLOQUE",
   PELOTA: "PELOTA",
   BATE: "BATE"
+}
+
+const AccionPotenciador = {
+  AUMENTAR: "AUMENTAR",
+  REDUCIR: "REDUCIR",
+  CLONAR: "CLONAR",
+  OPRIMIR: "OPRIMIR"
+}
+
+const PuntoAplicacion = {
+  ASIMISMO: "ASIMISMO",
+  RADIO: "RADIO",
+  HEIGHT: "HEIGHT",
+  WIDTH: "WIDTH"
 }
 
 
 const potenciadores = []
 potenciadores.push(
   new Potenciador(Math.random() * 600, 0,
-    56, 40, EstadoPotenciador.BATE, 2)
+    56, 40, ClasePotenciador.BATE, new Aplicador(
+      AccionPotenciador.AUMENTAR,
+      PuntoAplicacion.WIDTH,
+      3
+    ))
 )
+
 potenciadores.push(
   new Potenciador(Math.random() * 600, 0,
-    56, 40, EstadoPotenciador.PELOTA, 3)
+    56, 40, ClasePotenciador.PELOTA, new Aplicador(
+      AccionPotenciador.CLONAR,
+      PuntoAplicacion.ASIMISMO,
+      3
+    ))
 )
+
 potenciadores.push(
   new Potenciador(Math.random() * 600, 0,
-    56, 40, EstadoPotenciador.BLOQUE, 0)
+    56, 40, ClasePotenciador.BLOQUE, new Aplicador(
+      AccionPotenciador.OPRIMIR,
+      PuntoAplicacion.ASIMISMO
+    ))
 )
 
 const potenciadoresEnJuego = []
 let timer = null
-let index = 0
 function suministrarPotenciador() {
-  const potenciador = potenciadores[index]
-  index++
-  if (index >= potenciadores.length) {
-    index = 0
-  }
+  const potenciador = potenciadores.pop()
+  potenciadores.unshift(potenciador)
   potenciadoresEnJuego.push(potenciador.newInstance())
 }
+
 
 const BRICK_STATUS = {
   ACTIVE: 1,
@@ -140,7 +166,7 @@ function drawBall() {
 function drawPotenciador(x, y, texture) {
   ctx.fillStyle = "#000"
   ctx.beginPath()
-  if (texture === EstadoPotenciador.PELOTA) {
+  if (texture === ClasePotenciador.PELOTA) {
     ctx.arc(x, y, 20, 0, 2 * Math.PI)
   } else {
     ctx.rect(x, y, 46, 30)
@@ -151,15 +177,15 @@ function drawPotenciador(x, y, texture) {
 
 function drawPaddle() {
   ctx.drawImage(
-    $sprite, // imagen
-    29, // clipX: coordenadas de recorte
-    174, // clipY: coordenadas de recorte
-    paddle.width, // el tamaño del recorte
-    paddle.height, // tamaño del recorte
-    state.paddleX, // posición X del dibujo
-    state.paddleY, // posición Y del dibujo
-    paddle.width, // ancho del dibujo
-    paddle.height // alto del dibujo
+    $sprite,
+    29,
+    174,
+    paddle.width,
+    paddle.height,
+    state.paddleX,
+    state.paddleY,
+    paddle.width,
+    paddle.height
   )
 
 }
@@ -192,12 +218,11 @@ function drawUI() {
 }
 
 function collisionDetection() {
-  let total = 0
   for (let c = 0; c < brickColumnCount; c++) {
     for (let r = 0; r < brickRowCount; r++) {
       const currentBrick = bricks[c][r]
       if (currentBrick.status === BRICK_STATUS.DESTROYED) continue;
-      total++
+
       if (ballCollision.touching(currentBrick.body)) {
         velocidad.dy = -velocidad.dy
         currentBrick.status = BRICK_STATUS.DESTROYED
@@ -275,7 +300,7 @@ function initEvents() {
       state.running = !state.running
     } else if (key === "Enter") {
       if (!state.started || state.gameOver) {
-        timer = setInterval(suministrarPotenciador, 1000)
+        timer = setInterval(suministrarPotenciador, 4000)
         reset()
       }
     }
@@ -362,13 +387,22 @@ function draw() {
     return potenciador
   }).forEach(potenciador => {
     if (potenciador.touching(paddleCollision)) {
-      console.log("touching", potenciador)
+      if (!potenciador.isAtEnd()) {
+        potenciador.cogido = true
+        potenciador.run()
+        if (potenciador.texture === ClasePotenciador.BLOQUE) {
+          const {aplicador} = potenciador
+          if (aplicador.accion === AccionPotenciador.OPRIMIR && aplicador.puntoAplicacion === PuntoAplicacion.ASIMISMO) {
+            ballCollision.enabled = false
+          }
+        }
+      }
     }
     drawPotenciador(potenciador.x, potenciador.y, potenciador.texture)
   })
 
   potenciadoresEnJuego.map(p => {
-    if (p.y > 500) {
+    if (p.y > 500 && !p.cogido) {
       p.fuera = true
     }
     return p
@@ -376,6 +410,21 @@ function draw() {
     const index = potenciadoresEnJuego.findIndex(p => p.fuera)
     potenciadoresEnJuego.splice(index, 1)
   })
+
+  const potenciador = potenciadoresEnJuego.find(p=>p.cogido || p.isAtEnd())
+  if(potenciador) {
+    if (potenciador.isAtEnd()) {
+      potenciador.reset()    
+      if (potenciador.texture === ClasePotenciador.BLOQUE) {
+        const {aplicador} = potenciador
+        if (aplicador.accion === AccionPotenciador.OPRIMIR && aplicador.puntoAplicacion === PuntoAplicacion.ASIMISMO) {
+          ballCollision.enabled = true
+        }
+      } 
+    } else {
+      potenciador.update()
+    }
+  }
 
   paddleMovement()
   ballMovement()

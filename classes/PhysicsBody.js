@@ -5,6 +5,7 @@ class PhysicsBody extends Rectangle{
         super(x, y, width, height)
         this.gapX = 0
         this.gapY = 0
+        this.enabled = true
     }
 
     touching(body) {
@@ -23,7 +24,7 @@ class PhysicsBody extends Rectangle{
         } else {
             this.calculateGapY(this, body)
         }
-        return this.gapX < 0 && this.gapY < 0
+        return this.enabled && this.gapX < 0 && this.gapY < 0
     }
 
     calculateGapX(from, to) {
