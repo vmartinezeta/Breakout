@@ -8,7 +8,7 @@ export class Potenciador extends PhysicsBody{
         this.cogido = cogido
         this.fuera = fuera
         this.starttime = null
-        this.duration = 2000
+        this.duration = 6000
         this.timeFraction = 0
     }
 

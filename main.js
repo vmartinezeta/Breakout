@@ -69,8 +69,18 @@ const brick = {
 const ClasePotenciador = {
   BLOQUE: "BLOQUE",
   PELOTA: "PELOTA",
-  BATE: "BATE"
+  BATE: "BATE",
+  INDETERMINADO: "INDETERMINADO",
+  fromInt:function (index) {
+    const clase = this.toArray().find((_, key)=>key === index)
+    return clase ? clase: ClasePotenciador.INDETERMINADO
+  },
+  toArray:function() {
+    return Object.values(this).filter(val=> typeof val !== "function")
+  }
 }
+
+
 
 const AccionPotenciador = {
   AUMENTAR: "AUMENTAR",
@@ -115,12 +125,6 @@ potenciadores.push(
 )
 
 const potenciadoresEnJuego = []
-let timer = null
-function suministrarPotenciador() {
-  const potenciador = potenciadores.pop()
-  potenciadores.unshift(potenciador)
-  potenciadoresEnJuego.push(potenciador.newInstance())
-}
 
 
 const BRICK_STATUS = {
@@ -138,11 +142,13 @@ function createBrick() {
       const brickX = c * (brick.width + brick.padding) + brick.offsetLeft
       const brickY = r * (brick.height + brick.padding) + brick.offsetTop
       const random = Math.floor(Math.random() * 8)
+      
       bricks[c][r] = {
         x: brickX,
         y: brickY,
         status: BRICK_STATUS.ACTIVE,
         color: random,
+        clasePotenciador:ClasePotenciador.fromInt(random),
         body: new PhysicsBody(brickX, brickY, brick.width, brick.height)
       }
     }
@@ -226,12 +232,12 @@ function collisionDetection() {
       if (ballCollision.touching(currentBrick.body)) {
         velocidad.dy = -velocidad.dy
         currentBrick.status = BRICK_STATUS.DESTROYED
+        if (currentBrick.clasePotenciador!== ClasePotenciador.INDETERMINADO) {
+          const potenciador = potenciadores.find(p=>p.texture === currentBrick.clasePotenciador)
+          potenciadoresEnJuego.push(potenciador)
+        }
       }
     }
-  }
-
-  if (total === 0) {
-    state.gameOver = true
   }
 }
 
@@ -300,7 +306,6 @@ function initEvents() {
       state.running = !state.running
     } else if (key === "Enter") {
       if (!state.started || state.gameOver) {
-        timer = setInterval(suministrarPotenciador, 4000)
         reset()
       }
     }
@@ -414,7 +419,7 @@ function draw() {
   const potenciador = potenciadoresEnJuego.find(p=>p.cogido || p.isAtEnd())
   if(potenciador) {
     if (potenciador.isAtEnd()) {
-      potenciador.reset()    
+      potenciador.reset()
       if (potenciador.texture === ClasePotenciador.BLOQUE) {
         const {aplicador} = potenciador
         if (aplicador.accion === AccionPotenciador.OPRIMIR && aplicador.puntoAplicacion === PuntoAplicacion.ASIMISMO) {
@@ -432,7 +437,6 @@ function draw() {
 
   if (!state.started || state.gameOver || !state.running) {
     showMessage()
-    clearInterval(timer)
     return
   }
 
