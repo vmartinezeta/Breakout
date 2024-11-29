@@ -29,6 +29,7 @@ const velocidad = {
 const paddle = {
   sensitivity: 6,
   height: 10,
+  maxHeight:10,
   width: 50,
   leftPressed: false,
   rightPressed: false
@@ -71,12 +72,12 @@ const ClasePotenciador = {
   PELOTA: "PELOTA",
   BATE: "BATE",
   INDETERMINADO: "INDETERMINADO",
-  fromInt:function (index) {
-    const clase = this.toArray().find((_, key)=>key === index)
-    return clase ? clase: ClasePotenciador.INDETERMINADO
+  fromInt: function (index) {
+    const clase = this.toArray().find((_, key) => key === index)
+    return clase ? clase : ClasePotenciador.INDETERMINADO
   },
-  toArray:function() {
-    return Object.values(this).filter(val=> typeof val !== "function")
+  toArray: function () {
+    return Object.values(this).filter(val => typeof val !== "function")
   }
 }
 
@@ -93,7 +94,8 @@ const PuntoAplicacion = {
   ASIMISMO: "ASIMISMO",
   RADIO: "RADIO",
   HEIGHT: "HEIGHT",
-  WIDTH: "WIDTH"
+  WIDTH: "WIDTH",
+  RAPIDEZ: "RAPIDEZ"
 }
 
 
@@ -102,8 +104,34 @@ potenciadores.push(
   new Potenciador(Math.random() * 600, 0,
     56, 40, ClasePotenciador.BATE, new Aplicador(
       AccionPotenciador.AUMENTAR,
-      PuntoAplicacion.WIDTH,
+      PuntoAplicacion.HEIGHT,
       3
+    ))
+)
+
+potenciadores.push(
+  new Potenciador(Math.random() * 600, 0,
+    56, 40, ClasePotenciador.PELOTA, new Aplicador(
+      AccionPotenciador.AUMENTAR,
+      PuntoAplicacion.RADIO,
+      3
+    ))
+)
+
+potenciadores.push(
+  new Potenciador(Math.random() * 600, 0,
+    56, 40, ClasePotenciador.PELOTA, new Aplicador(
+      AccionPotenciador.AUMENTAR,
+      PuntoAplicacion.RAPIDEZ,
+      3
+    ))
+)
+
+potenciadores.push(
+  new Potenciador(Math.random() * 600, 0,
+    56, 40, ClasePotenciador.BATE, new Aplicador(
+      AccionPotenciador.OPRIMIR,
+      PuntoAplicacion.ASIMISMO
     ))
 )
 
@@ -142,13 +170,13 @@ function createBrick() {
       const brickX = c * (brick.width + brick.padding) + brick.offsetLeft
       const brickY = r * (brick.height + brick.padding) + brick.offsetTop
       const random = Math.floor(Math.random() * 8)
-      
+
       bricks[c][r] = {
         x: brickX,
         y: brickY,
         status: BRICK_STATUS.ACTIVE,
         color: random,
-        clasePotenciador:ClasePotenciador.fromInt(random),
+        clasePotenciador: ClasePotenciador.fromInt(random),
         body: new PhysicsBody(brickX, brickY, brick.width, brick.height)
       }
     }
@@ -172,11 +200,7 @@ function drawBall() {
 function drawPotenciador(x, y, texture) {
   ctx.fillStyle = "#000"
   ctx.beginPath()
-  if (texture === ClasePotenciador.PELOTA) {
-    ctx.arc(x, y, 20, 0, 2 * Math.PI)
-  } else {
-    ctx.rect(x, y, 46, 30)
-  }
+  ctx.rect(x, y, 46, 30)
   ctx.fill()
   ctx.closePath()
 }
@@ -191,7 +215,7 @@ function drawPaddle() {
     state.paddleX,
     state.paddleY,
     paddle.width,
-    paddle.height
+    paddle.maxHeight
   )
 
 }
@@ -232,9 +256,10 @@ function collisionDetection() {
       if (ballCollision.touching(currentBrick.body)) {
         velocidad.dy = -velocidad.dy
         currentBrick.status = BRICK_STATUS.DESTROYED
-        if (currentBrick.clasePotenciador!== ClasePotenciador.INDETERMINADO) {
-          const potenciador = potenciadores.find(p=>p.texture === currentBrick.clasePotenciador)
-          potenciadoresEnJuego.push(potenciador)
+        if (currentBrick.clasePotenciador !== ClasePotenciador.INDETERMINADO) {
+          const potenciador = potenciadores.find(p => p.texture === currentBrick.clasePotenciador)
+                    
+          potenciadoresEnJuego.push(potenciador.newInstance())
         }
       }
     }
@@ -371,8 +396,8 @@ function draw() {
 
   if (msFPSPrev < msNow) {
     msFPSPrev = window.performance.now() + 1000
-    framesPerSec = frames;
-    frames = 0;
+    framesPerSec = frames
+    frames = 0
   }
 
   cleanCanvas()
@@ -388,7 +413,7 @@ function draw() {
 
   potenciadoresEnJuego.map(potenciador => {
     potenciador.x = potenciador.x + Math.random() * vaiven - vaiven / 2
-    potenciador.y += 1
+    potenciador.y += 1/2
     return potenciador
   }).forEach(potenciador => {
     if (potenciador.touching(paddleCollision)) {
@@ -396,10 +421,13 @@ function draw() {
         potenciador.cogido = true
         potenciador.run()
         if (potenciador.texture === ClasePotenciador.BLOQUE) {
-          const {aplicador} = potenciador
+          const { aplicador } = potenciador
           if (aplicador.accion === AccionPotenciador.OPRIMIR && aplicador.puntoAplicacion === PuntoAplicacion.ASIMISMO) {
             ballCollision.enabled = false
           }
+        } else if (potenciador.texture === ClasePotenciador.BATE) {
+          const { aplicador } = potenciador
+          paddle.maxHeight = aplicador.cantidad*paddle.height
         }
       }
     }
@@ -416,16 +444,19 @@ function draw() {
     potenciadoresEnJuego.splice(index, 1)
   })
 
-  const potenciador = potenciadoresEnJuego.find(p=>p.cogido || p.isAtEnd())
-  if(potenciador) {
+  const potenciador = potenciadoresEnJuego.find(p => p.cogido)
+  if (potenciador) {
     if (potenciador.isAtEnd()) {
       potenciador.reset()
+      potenciador.fuera = true
       if (potenciador.texture === ClasePotenciador.BLOQUE) {
-        const {aplicador} = potenciador
+        const { aplicador } = potenciador
         if (aplicador.accion === AccionPotenciador.OPRIMIR && aplicador.puntoAplicacion === PuntoAplicacion.ASIMISMO) {
           ballCollision.enabled = true
         }
-      } 
+      } else if (potenciador.texture === ClasePotenciador.BATE) {
+        paddle.maxHeight = paddle.height
+      }
     } else {
       potenciador.update()
     }
