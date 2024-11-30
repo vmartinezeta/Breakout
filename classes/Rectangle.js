@@ -4,6 +4,14 @@ class Rectangle {
         this.y = y
         this.width = width
         this.height = height
+        this.cache = structuredClone(this)
+    }
+
+    reset() {
+        this.x = this.cache.x
+        this.y = this.cache.y
+        this.width = this.cache.width
+        this.height = this.cache.height
     }
 }
 

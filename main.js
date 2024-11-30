@@ -29,7 +29,7 @@ const velocidad = {
 const paddle = {
   sensitivity: 6,
   height: 10,
-  maxHeight:10,
+  maxHeight: 10,
   width: 50,
   leftPressed: false,
   rightPressed: false
@@ -37,10 +37,10 @@ const paddle = {
 
 
 const ballRadius = 10
-let stateDefault = {
+let state = {
   ballRadius,
   x: canvas.width / 2,
-  y: canvas.height - 2 * paddle.height - ballRadius,
+  y: canvas.height - 2 * paddle.height - ballRadius,  
   paddleX: (canvas.width - paddle.width) / 2,
   paddleY: canvas.height - 2 * paddle.height,
   started: false,
@@ -48,12 +48,13 @@ let stateDefault = {
   gameOver: false
 }
 
-let state = { ...stateDefault }
+
 
 const ballCollision = new PhysicsBody(state.x, state.y, state.ballRadius, state.ballRadius)
 const paddleCollision = new PhysicsBody(state.paddleX, state.paddleY, 50, 10)
 
-
+let clones =[]
+crearClones()
 const brickRowCount = 6
 const brickColumnCount = 13
 let bricks = []
@@ -81,8 +82,6 @@ const ClasePotenciador = {
   }
 }
 
-
-
 const AccionPotenciador = {
   AUMENTAR: "AUMENTAR",
   REDUCIR: "REDUCIR",
@@ -109,21 +108,13 @@ potenciadores.push(
     ))
 )
 
-potenciadores.push(
-  new Potenciador(Math.random() * 600, 0,
-    56, 40, ClasePotenciador.PELOTA, new Aplicador(
-      AccionPotenciador.AUMENTAR,
-      PuntoAplicacion.RADIO,
-      3
-    ))
-)
 
 potenciadores.push(
   new Potenciador(Math.random() * 600, 0,
     56, 40, ClasePotenciador.PELOTA, new Aplicador(
       AccionPotenciador.AUMENTAR,
       PuntoAplicacion.RAPIDEZ,
-      3
+      5
     ))
 )
 
@@ -160,6 +151,7 @@ const BRICK_STATUS = {
   DESTROYED: 0
 }
 
+
 createBrick()
 
 function createBrick() {
@@ -183,6 +175,25 @@ function createBrick() {
   }
 }
 
+function crearClones(parClones=2) {
+  for(let i=0;i<parClones;i++) {
+    clones.push(ballCollision.newInstance())
+  }
+  const n = parClones/2
+  let x = 25
+  let i = 0
+  for(;i<n; i++) {
+    clones[i].x = ballCollision.x-x
+    x+=25
+  }
+
+  x = 25
+  for(;i<parClones; i++) {
+    clones[i].x = ballCollision.x+x
+    x+=25
+  }
+}
+
 function createHtmlImg(url) {
   const img = new Image()
   img.src = url
@@ -191,7 +202,10 @@ function createHtmlImg(url) {
 
 function drawBall() {
   ctx.beginPath()
-  ctx.arc(state.x, state.y, state.ballRadius, 0, Math.PI * 2)
+  ctx.arc(ballCollision.x, ballCollision.y, ballCollision.width, 0, Math.PI * 2)
+  for(let ball of clones) {
+    ctx.arc(ball.x, ball.y, ball.width, 0, Math.PI * 2)
+  }
   ctx.fillStyle = state.started && state.gameOver ? '#ff0000' : '#fff'
   ctx.fill()
   ctx.closePath()
@@ -212,8 +226,8 @@ function drawPaddle() {
     174,
     paddle.width,
     paddle.height,
-    state.paddleX,
-    state.paddleY,
+    paddleCollision.x,
+    paddleCollision.y,
     paddle.width,
     paddle.maxHeight
   )
@@ -245,6 +259,9 @@ function drawBricks() {
 
 function drawUI() {
   ctx.fillText(`FPS: ${framesPerSec}`, 5, 10)
+  const normalizar = new Set(potenciadoresEnJuego.filter(({ cogido }) => cogido).map(({ texture }) => texture))
+  const texto = [...normalizar].join(",")
+  ctx.fillText(`Potenciador: ${texto !== "" ? texto : "N/D"}`, 5, 25)
 }
 
 function collisionDetection() {
@@ -258,7 +275,7 @@ function collisionDetection() {
         currentBrick.status = BRICK_STATUS.DESTROYED
         if (currentBrick.clasePotenciador !== ClasePotenciador.INDETERMINADO) {
           const potenciador = potenciadores.find(p => p.texture === currentBrick.clasePotenciador)
-                    
+
           potenciadoresEnJuego.push(potenciador.newInstance())
         }
       }
@@ -267,40 +284,40 @@ function collisionDetection() {
 }
 
 function ballMovement() {
-  if (state.x + velocidad.dx > canvas.width - state.ballRadius
-    || state.x + velocidad.dx < state.ballRadius) {
+  if (ballCollision.x + velocidad.dx > canvas.width - ballCollision.width
+    || ballCollision.x + velocidad.dx < ballCollision.width) {
     velocidad.dx = -velocidad.dx
   }
 
-  if (state.y + velocidad.dy < state.ballRadius) {
+  if (ballCollision.y + velocidad.dy < ballCollision.width) {
     velocidad.dy = -velocidad.dy
   }
 
   if (paddleCollision.touching(ballCollision)) {
     velocidad.dy = -velocidad.dy
-    state.y = state.paddleY - state.ballRadius
-  } else if (state.y + velocidad.dy > canvas.height - state.ballRadius
-    || state.y + velocidad.dy > state.paddleY + paddle.height) {
+    ballCollision.y = state.paddleY - ballCollision.width
+  } else if (ballCollision.y + velocidad.dy > canvas.height - ballCollision.width
+    || ballCollision.y + velocidad.dy > state.paddleY + paddle.height) {
     state.running = false
     state.gameOver = true
   }
 
   if (state.gameOver) return
   if (!state.started) {
-    state.x = state.paddleX + paddle.width / 2
+    ballCollision.x = state.paddleX + paddle.width / 2
   } else if (state.running) {
-    state.x += velocidad.dx
-    state.y += velocidad.dy
+    ballCollision.x += velocidad.dx
+    ballCollision.y += velocidad.dy
   }
 }
 
 function paddleMovement() {
   if (state.gameOver || state.started && !state.running) return
 
-  if (paddle.rightPressed && state.paddleX < canvas.width - paddle.width) {
-    state.paddleX += paddle.sensitivity
-  } else if (paddle.leftPressed && state.paddleX > 0) {
-    state.paddleX -= paddle.sensitivity
+  if (paddle.rightPressed && paddleCollision.x < canvas.width - paddle.width) {
+    paddleCollision.x += paddle.sensitivity
+  } else if (paddle.leftPressed && paddleCollision.x > 0) {
+    paddleCollision.x -= paddle.sensitivity
   }
 }
 
@@ -339,11 +356,10 @@ function initEvents() {
 }
 
 function reset() {
-  const x = state.x
+  ballCollision.reset()
+  paddleCollision.reset()
   state = {
-    ...stateDefault,
-    x,
-    paddleX: x - paddle.width / 2,
+    ...state,
     running: true,
     started: true,
     gameOver: false
@@ -403,9 +419,6 @@ function draw() {
   cleanCanvas()
 
 
-  ballCollision.setPosition(state.x, state.y)
-  paddleCollision.setPosition(state.paddleX, state.paddleY)
-
   drawBall()
   drawPaddle()
   drawBricks()
@@ -413,7 +426,7 @@ function draw() {
 
   potenciadoresEnJuego.map(potenciador => {
     potenciador.x = potenciador.x + Math.random() * vaiven - vaiven / 2
-    potenciador.y += 1/2
+    potenciador.y += 1 / 2
     return potenciador
   }).forEach(potenciador => {
     if (potenciador.touching(paddleCollision)) {
@@ -427,7 +440,10 @@ function draw() {
           }
         } else if (potenciador.texture === ClasePotenciador.BATE) {
           const { aplicador } = potenciador
-          paddle.maxHeight = aplicador.cantidad*paddle.height
+          paddle.maxHeight = aplicador.cantidad * paddle.height
+        } else if (potenciador.texture === ClasePotenciador.PELOTA && velocidad.dx % 3 === 0) {
+          velocidad.dx = (velocidad.dx/3)*5
+          velocidad.dy = (velocidad.dy/3)*5
         }
       }
     }
@@ -456,6 +472,9 @@ function draw() {
         }
       } else if (potenciador.texture === ClasePotenciador.BATE) {
         paddle.maxHeight = paddle.height
+      } else if (potenciador.texture === ClasePotenciador.PELOTA && velocidad.dx % 5 === 0 ) {
+        velocidad.dx = (velocidad.dx/5)*3
+        velocidad.dy = (velocidad.dy/5)*3
       }
     } else {
       potenciador.update()

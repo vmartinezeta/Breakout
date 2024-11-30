@@ -40,6 +40,9 @@ class PhysicsBody extends Rectangle{
         this.y = y
     }
 
+    newInstance() {
+        return new PhysicsBody(this.x, this.y,this.width, this.height)
+    }
 }
 
 export default PhysicsBody
