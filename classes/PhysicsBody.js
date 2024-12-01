@@ -1,11 +1,12 @@
 import Rectangle from "./Rectangle.js"
 
 class PhysicsBody extends Rectangle{
-    constructor(x, y, width, height) {
+    constructor(x, y, width, height, original) {
         super(x, y, width, height)
         this.gapX = 0
         this.gapY = 0
         this.enabled = true
+        this.original = original || true
     }
 
     touching(body) {
@@ -41,7 +42,7 @@ class PhysicsBody extends Rectangle{
     }
 
     newInstance() {
-        return new PhysicsBody(this.x, this.y,this.width, this.height)
+        return new PhysicsBody(this.x, this.y,this.width, this.height, this.original)
     }
 }
 

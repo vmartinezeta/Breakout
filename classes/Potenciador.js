@@ -22,6 +22,10 @@ export class Potenciador extends PhysicsBody{
         this.starttime = Date.now()
     }
     
+    isAtHome() {
+        return this.starttime === null
+    }
+
     isAtEnd() {
         return this.timeFraction>=1
     }

@@ -40,7 +40,7 @@ const ballRadius = 10
 let state = {
   ballRadius,
   x: canvas.width / 2,
-  y: canvas.height - 2 * paddle.height - ballRadius,  
+  y: canvas.height - 2 * paddle.height - ballRadius,
   paddleX: (canvas.width - paddle.width) / 2,
   paddleY: canvas.height - 2 * paddle.height,
   started: false,
@@ -49,12 +49,10 @@ let state = {
 }
 
 
-
 const ballCollision = new PhysicsBody(state.x, state.y, state.ballRadius, state.ballRadius)
 const paddleCollision = new PhysicsBody(state.paddleX, state.paddleY, 50, 10)
 
-let clones =[]
-crearClones()
+let clones = []
 const brickRowCount = 6
 const brickColumnCount = 13
 let bricks = []
@@ -107,7 +105,6 @@ potenciadores.push(
       3
     ))
 )
-
 
 potenciadores.push(
   new Potenciador(Math.random() * 600, 0,
@@ -175,22 +172,18 @@ function createBrick() {
   }
 }
 
-function crearClones(parClones=2) {
-  for(let i=0;i<parClones;i++) {
+function crearClones(cantidad = 2) {
+  if (cantidad % 2 !== 0) {
+    throw new TypeError("crearClones(cantidad), se permite un numero par.")
+  }
+  const par = cantidad / 2
+  for (let i = 0; i < cantidad + 1; i++) {
     clones.push(ballCollision.newInstance())
-  }
-  const n = parClones/2
-  let x = 25
-  let i = 0
-  for(;i<n; i++) {
-    clones[i].x = ballCollision.x-x
-    x+=25
-  }
-
-  x = 25
-  for(;i<parClones; i++) {
-    clones[i].x = ballCollision.x+x
-    x+=25
+    if (i === par) continue
+    const SEPARACION = 25
+    const lado = i < par ? -1 * SEPARACION * (par - i) : SEPARACION * (i - par)
+    clones[i].x = ballCollision.x + lado
+    clones[i].y = ballCollision.y - 10
   }
 }
 
@@ -200,12 +193,9 @@ function createHtmlImg(url) {
   return img
 }
 
-function drawBall() {
+function drawBall(ballCollision) {
   ctx.beginPath()
   ctx.arc(ballCollision.x, ballCollision.y, ballCollision.width, 0, Math.PI * 2)
-  for(let ball of clones) {
-    ctx.arc(ball.x, ball.y, ball.width, 0, Math.PI * 2)
-  }
   ctx.fillStyle = state.started && state.gameOver ? '#ff0000' : '#fff'
   ctx.fill()
   ctx.closePath()
@@ -264,7 +254,7 @@ function drawUI() {
   ctx.fillText(`Potenciador: ${texto !== "" ? texto : "N/D"}`, 5, 25)
 }
 
-function collisionDetection() {
+function collisionDetection(ballCollision) {
   for (let c = 0; c < brickColumnCount; c++) {
     for (let r = 0; r < brickRowCount; r++) {
       const currentBrick = bricks[c][r]
@@ -273,17 +263,19 @@ function collisionDetection() {
       if (ballCollision.touching(currentBrick.body)) {
         velocidad.dy = -velocidad.dy
         currentBrick.status = BRICK_STATUS.DESTROYED
-        if (currentBrick.clasePotenciador !== ClasePotenciador.INDETERMINADO) {
-          const potenciador = potenciadores.find(p => p.texture === currentBrick.clasePotenciador)
-
+        if (ballCollision.original && currentBrick.clasePotenciador !== ClasePotenciador.INDETERMINADO) {
+          
+          const candidatos = potenciadores.filter(p => p.texture === currentBrick.clasePotenciador)
+          const random = Math.floor(Math.random() * candidatos.length)
+          const potenciador = candidatos[random]
           potenciadoresEnJuego.push(potenciador.newInstance())
         }
-      }
+      } 
     }
   }
 }
 
-function ballMovement() {
+function ballMovement(ballCollision) {
   if (ballCollision.x + velocidad.dx > canvas.width - ballCollision.width
     || ballCollision.x + velocidad.dx < ballCollision.width) {
     velocidad.dx = -velocidad.dx
@@ -358,6 +350,7 @@ function initEvents() {
 function reset() {
   ballCollision.reset()
   paddleCollision.reset()
+  clones = []
   state = {
     ...state,
     running: true,
@@ -418,8 +411,10 @@ function draw() {
 
   cleanCanvas()
 
-
-  drawBall()
+  drawBall(ballCollision)
+  clones.forEach(ball => {
+    drawBall(ball)
+  })
   drawPaddle()
   drawBricks()
   drawUI()
@@ -429,24 +424,26 @@ function draw() {
     potenciador.y += 1 / 2
     return potenciador
   }).forEach(potenciador => {
-    if (potenciador.touching(paddleCollision)) {
-      if (!potenciador.isAtEnd()) {
-        potenciador.cogido = true
-        potenciador.run()
-        if (potenciador.texture === ClasePotenciador.BLOQUE) {
-          const { aplicador } = potenciador
-          if (aplicador.accion === AccionPotenciador.OPRIMIR && aplicador.puntoAplicacion === PuntoAplicacion.ASIMISMO) {
-            ballCollision.enabled = false
-          }
-        } else if (potenciador.texture === ClasePotenciador.BATE) {
-          const { aplicador } = potenciador
-          paddle.maxHeight = aplicador.cantidad * paddle.height
-        } else if (potenciador.texture === ClasePotenciador.PELOTA && velocidad.dx % 3 === 0) {
-          velocidad.dx = (velocidad.dx/3)*5
-          velocidad.dy = (velocidad.dy/3)*5
+    if (potenciador.touching(paddleCollision) && potenciador.isAtHome()) {
+      potenciador.cogido = true
+      const { aplicador } = potenciador
+      potenciador.run()
+      if (potenciador.texture === ClasePotenciador.BLOQUE) {
+        const { aplicador } = potenciador
+        if (aplicador.accion === AccionPotenciador.OPRIMIR && aplicador.puntoAplicacion === PuntoAplicacion.ASIMISMO) {
+          ballCollision.enabled = false
         }
+      } else if (aplicador.puntoAplicacion === PuntoAplicacion.HEIGHT) {
+        const { aplicador } = potenciador
+        paddle.maxHeight = aplicador.cantidad * paddle.height
+      } else if (aplicador.puntoAplicacion === PuntoAplicacion.RAPIDEZ && velocidad.dx % 3 === 0) {
+        velocidad.dx = (velocidad.dx / 3) * 5
+        velocidad.dy = (velocidad.dy / 3) * 5
+      } else if (aplicador.puntoAplicacion === PuntoAplicacion.ASIMISMO) {
+        crearClones()
       }
     }
+
     drawPotenciador(potenciador.x, potenciador.y, potenciador.texture)
   })
 
@@ -463,18 +460,20 @@ function draw() {
   const potenciador = potenciadoresEnJuego.find(p => p.cogido)
   if (potenciador) {
     if (potenciador.isAtEnd()) {
-      potenciador.reset()
+      const { aplicador } = potenciador
       potenciador.fuera = true
       if (potenciador.texture === ClasePotenciador.BLOQUE) {
         const { aplicador } = potenciador
         if (aplicador.accion === AccionPotenciador.OPRIMIR && aplicador.puntoAplicacion === PuntoAplicacion.ASIMISMO) {
           ballCollision.enabled = true
         }
-      } else if (potenciador.texture === ClasePotenciador.BATE) {
+      } else if (aplicador.puntoAplicacion === PuntoAplicacion.HEIGHT) {
         paddle.maxHeight = paddle.height
-      } else if (potenciador.texture === ClasePotenciador.PELOTA && velocidad.dx % 5 === 0 ) {
-        velocidad.dx = (velocidad.dx/5)*3
-        velocidad.dy = (velocidad.dy/5)*3
+      } else if (aplicador.puntoAplicacion === PuntoAplicacion.RAPIDEZ && velocidad.dx % 5 === 0) {
+        velocidad.dx = (velocidad.dx / 5) * 3
+        velocidad.dy = (velocidad.dy / 5) * 3
+      } else if (aplicador.puntoAplicacion === PuntoAplicacion.ASIMISMO) {
+        clones = []
       }
     } else {
       potenciador.update()
@@ -482,7 +481,11 @@ function draw() {
   }
 
   paddleMovement()
-  ballMovement()
+
+  ballMovement(ballCollision)
+  clones.forEach(ball => {
+    ballMovement(ball)
+  })
 
 
   if (!state.started || state.gameOver || !state.running) {
@@ -492,7 +495,10 @@ function draw() {
 
   removeMessage()
 
-  collisionDetection()
+  collisionDetection(ballCollision)
+  clones.forEach(ball => {
+    collisionDetection(ball)
+  })
 }
 
 
